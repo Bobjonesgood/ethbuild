@@ -1,138 +1,87 @@
-\# 🚀 Ethbuild
 
 
 
-\*\*Ethbuild\*\* is a high-reliability Model Context Protocol (MCP) server designed to give AI coding assistants (like Claude, Cursor, and Roo Code) direct terminal access to local smart contract frameworks. 
+# 🚀 Ethbuild
 
-
+**Ethbuild** is a high-reliability Model Context Protocol (MCP) server designed to give AI coding assistants (like Claude, Cursor, and Cline) direct terminal access to local smart contract frameworks.
 
 By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinating compilation syntax errors. The AI can autonomously compile smart contracts, interpret output logs, run test suites, and patch logic bugs directly on your machine.
 
+---
 
+## ✨ Features
 
-\---
+* ⚙️ **Autonomous Smart Contract Compilation:** Supports local framework verification via Hardhat and Foundry execution environments.
+* 🛡️ **Bulletproof Execution Safety Engine:** Hardened with a native 45-second watchdog execution cutoff timer to prevent system lockups or frozen IDE instances.
+* 🧠 **Buffer-Overflow Resistance:** Heavy-duty 10MB memory streaming buffer designed to process massive log outputs from complex multi-file smart contract test suites without choking.
+* 🕵️ **Input Sanitization Shell-Defenses:** Built-in regex filters to strip malicious or accidental command-chain injections before executing payloads on your terminal.
+* 📁 **Explicit Project Targeting:** Every tool call takes a `projectPath` argument, so Ethbuild always compiles the project you actually mean — not wherever the server process happened to start.
 
+---
 
+## 📥 Installation
 
-\## ✨ Features
-
-
-
-\*   ⚙️ \*\*Autonomous Smart Contract Compilation:\*\* Supports local framework verification via Hardhat and Foundry execution environments.
-
-\*   🛡️ \*\*Bulletproof Execution Safety Engine:\*\* Hardened with a native 45-second watchdog execution cutoff timer to prevent system lockups or frozen IDE instances.
-
-\*   🧠 \*\*Buffer-Overflow Resistance:\*\* Heavy-duty 10MB memory streaming buffer designed to process massive log outputs from complex multi-file smart contract test suites without chocking.
-
-\*   🕵️‍♂️ \*\*Input Sanitization Shell-Defenses:\*\* Built-in regex filters to strip malicious or accidental command-chain injections before executing payloads on your terminal.
-
-
-
-\---
-
-
-
-\## 📥 Installation
-
-
-
-Install Ethbuild globally on your system instantly using the Node Package Manager:
-
-
+Ethbuild isn't published to the npm registry yet — install it by cloning and building locally:
 
 ```bash
-
-npm install -g ethbuild
-
+git clone https://github.com/Bobjonesgood/ethbuild.git
+cd ethbuild
+npm install
+npm run build
 ```
 
+This produces `dist/index.js`, which is the compiled entry point your AI client will launch.
 
+---
 
-\---
+## 🛠️ AI Client Configuration
 
+To grant your AI coding agent access to Ethbuild, add this server execution block to your editor's MCP settings file.
 
-
-\## 🛠️ AI Client Configuration
-
-
-
-To grant your AI coding agent access to Ethbuild, add this server execution block directly into your editor's MCP settings configuration file:
-
-
-
-\### 🧩 For Claude Desktop / Cursor / Roo Code (`cline\_mcp\_settings.json`)
-
-
+**For Claude Desktop:** `claude_desktop_config.json`
+**For Cline (in VS Code):** `cline_mcp_settings.json`
 
 ```json
-
 {
-
-&#x20; "mcpServers": {
-
-&#x20;   "ethbuild": {
-
-&#x20;     "command": "node",
-
-&#x20;     "args": \[
-
-&#x20;       "C:/ethbuild/dist/index.js"
-
-&#x20;     ]
-
-&#x20;   }
-
-&#x20; }
-
+  "mcpServers": {
+    "ethbuild": {
+      "command": "node",
+      "args": [
+        "C:/ethbuild/dist/index.js"
+      ]
+    }
+  }
 }
-
 ```
 
+> **Note:** Cline's MCP settings file has moved locations across versions. If your server shows as connected but tools aren't behaving as expected, confirm you're editing the file Cline is actually reading — check `%USERPROFILE%\.cline\data\settings\cline_mcp_settings.json` first.
 
+---
 
-\---
+## 📖 Available AI Tools
 
+Once connected, your AI assistant will discover and invoke these tools. Both require `projectPath` — the absolute path to the root of the smart contract project you want Ethbuild to act on (the folder containing `foundry.toml` or `hardhat.config.js`).
 
+* **`compile_contracts`** — Triggers `forge build` or `npx hardhat compile` inside `projectPath` to check syntax validity.
+```json
+  { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts" }
+```
+* **`run_test_suite`** — Runs local framework test files (`forge test` / `npx hardhat test`) inside `projectPath`, with an optional `matchTest` filter to isolate a specific test.
+```json
+  { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts", "matchTest": "testTransfer" }
+```
 
-\## 📖 Available AI Tools
+---
 
+## 💰 Monetization Structure
 
+Ethbuild operates on an **Open-Core Freemium Model**:
 
-Once connected, your AI assistant will naturally discover and invoke these operational capabilities:
+* **Free Core Tier:** All local compilation, safety sandboxing, testing utility, and source code are free and open-source forever for individual engineers.
+* **Premium Enterprise Tier:** Teams can append a shared `ETHBUILD_TEAM_KEY` to stream background webhook performance metrics to a central company dashboard.
 
+---
 
+## 📄 License
 
-\*   `compile\_contracts`: Triggers `forge build` or `npx hardhat compile` inside your workspace directory to parse active syntax validity.
-
-\*   `run\_test\_suite`: Runs local framework test files (`forge test` / `npx hardhat test`) with optional filters to isolate unique bugs.
-
-
-
-\---
-
-
-
-\## 💰 Monetization Structure
-
-
-
-Ethbuild operates on an \*\*Open-Core Freemium Model\*\*:
-
-\*   \*\*Free Core Tier:\*\* 100% of the local compilation, safety sandboxing, testing utility, and source capabilities are free and open-source forever for individual engineers.
-
-\*   \*\*Premium Enterprise Tier:\*\* Teams can seamlessly append a shared `ETHBUILD\_TEAM\_KEY` to stream silent background webhook performance metric analytics straight to a central company dashboard.
-
-
-
-\---
-
-
-
-\## 📄 License
-
-
-
-Distributed under the MIT License. Open-source development utility for the global Web3 ecosystem.
-
-
-
+Distributed under the MIT License. Open-source development utility for the Web3 ecosystem.
