@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "ethbuild": {
+      "command": "node",
+      "args": [
+        "C:/ethbuild/dist/index.js"
+      ]
+    }
+  }
+}

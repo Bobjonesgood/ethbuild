@@ -1,0 +1,27 @@
+{
+  "name": "ethbuild",
+  "version": "1.0.0",
+  "description": "Ethbuild: High-reliability MCP Server for Solidity Compilation and Testing",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp-server",
+    "solidity",
+    "foundry",
+    "hardhat",
+    "web3"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}
