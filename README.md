@@ -13,7 +13,7 @@ By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinat
 * **Buffer-Overflow Resistance:** Heavy-duty 10MB memory streaming buffer designed to process massive log outputs from complex multi-file smart contract test suites without choking.
 * **Input Sanitization Shell-Defenses:** Built-in regex filters to strip malicious or accidental command-chain injections before executing payloads on your terminal.
 * **Explicit Project Targeting:** Every tool call takes a `projectPath` argument, so Ethbuild always compiles the project you actually mean -- not wherever the server process happened to start.
-* **Token-Efficient Output:** Successful build/test output is automatically truncated past 4,000 characters to keep AI token usage predictable on large projects. Failures always return full, untruncated output so the AI has everything it needs to diagnose and fix the problem.
+* **Token-Efficient Output:** Successful build/test output is automatically truncated past 4,000 characters to keep AI token usage predictable on large projects. Failed runs are condensed to just the compiler errors and failing test names (`[FAIL: reason] testName()`), deduplicated, so the AI gets what it needs to fix the problem without a wall of trace output. If the output format isn't recognized, the raw output is returned with a larger 8,000-character cap.
 
 ---
 
