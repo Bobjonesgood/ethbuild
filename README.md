@@ -14,6 +14,7 @@ By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinat
 * **Input Sanitization Shell-Defenses:** Built-in regex filters to strip malicious or accidental command-chain injections before executing payloads on your terminal.
 * **Explicit Project Targeting:** Every tool call takes a `projectPath` argument, so Ethbuild always compiles the project you actually mean -- not wherever the server process happened to start.
 * **Token-Efficient Output:** Successful build/test output is automatically truncated past 4,000 characters to keep AI token usage predictable on large projects. Failed runs are condensed to just the compiler errors and failing test names (`[FAIL: reason] testName()`), deduplicated, so the AI gets what it needs to fix the problem without a wall of trace output. If the output format isn't recognized, the raw output is returned with a larger 8,000-character cap.
+* **Private by Default:** No telemetry is sent unless you explicitly configure it. See the Configuration section.
 
 ---
 
@@ -69,23 +70,60 @@ Ethbuild doesn't bundle Foundry or Hardhat itself -- it runs whatever toolchain 
 
 Once connected, your AI assistant will discover and invoke these tools. Both require `projectPath` -- the absolute path to the root of the smart contract project you want Ethbuild to act on (the folder containing `foundry.toml` or `hardhat.config.js`).
 
-* **`compile_contracts`** -- Triggers `forge build` or `npx hardhat compile` inside `projectPath` to check syntax validity.
+**`compile_contracts`** -- Triggers `forge build` or `npx hardhat compile` inside `projectPath` to check syntax validity.
+
 ```json
-  { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts" }
+{ "framework": "foundry", "projectPath": "C:/Users/you/my-contracts" }
 ```
-* **`run_test_suite`** -- Runs local framework test files (`forge test` / `npx hardhat test`) inside `projectPath`, with an optional `matchTest` filter to isolate a specific test.
+
+**`run_test_suite`** -- Runs local framework test files (`forge test` / `npx hardhat test`) inside `projectPath`, with an optional `matchTest` filter to isolate a specific test.
+
 ```json
-  { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts", "matchTest": "testTransfer" }
+{ "framework": "foundry", "projectPath": "C:/Users/you/my-contracts", "matchTest": "testTransfer" }
 ```
 
 ---
 
-## Monetization Structure
+## Configuration (Optional)
 
-Ethbuild operates on an **Open-Core Freemium Model**:
+Ethbuild works with no configuration. Two optional environment variables enable team telemetry:
 
-* **Free Core Tier:** All local compilation, safety sandboxing, testing utility, and source code are free and open-source forever for individual engineers.
-* **Premium Enterprise Tier:** Teams can append a shared `ETHBUILD_TEAM_KEY` to stream background webhook performance metrics to a central company dashboard.
+* `ETHBUILD_TEAM_KEY` -- your team's access token.
+* `ETHBUILD_TELEMETRY_URL` -- the https endpoint that should receive the metrics.
+
+Telemetry stays off unless **both** are set, and there is no default endpoint, so nothing is ever sent to a server you did not choose. Non-https URLs are ignored.
+
+Ethbuild does not read `.env` files. Set the variables in the `env` block of your MCP server config:
+
+```json
+{
+  "mcpServers": {
+    "ethbuild": {
+      "command": "node",
+      "args": [
+        "C:/ethbuild/dist/index.js"
+      ],
+      "env": {
+        "ETHBUILD_TEAM_KEY": "your-team-key-here",
+        "ETHBUILD_TELEMETRY_URL": "https://your-dashboard.example.com/ingest"
+      }
+    }
+  }
+}
+```
+
+A template of these variables is included as `.env.example`.
+
+**What telemetry sends:** a timestamp, the framework (foundry or hardhat), whether the run was a compile or a test, whether it succeeded or failed, and the operating system. It never sends your code, file paths, or command output.
+
+---
+
+## Roadmap and Business Model
+
+Ethbuild follows an open-core model:
+
+* **Free core (available now):** All local compilation, testing, safety features, and source code are free and open source for individual engineers.
+* **Team dashboard (planned):** A hosted dashboard for teams to view shared build metrics. This does not exist yet. Until it launches, the telemetry settings above work with any https endpoint you run yourself.
 
 ---
 

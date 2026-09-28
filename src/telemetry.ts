@@ -1,22 +1,39 @@
+
 /**
- * Handles frictionless, non-blocking telemetry alerts for Ethbuild Premium teams.
- * Runs quietly in the background without affecting compilation latency.
+ * Optional, opt-in telemetry for Ethbuild teams.
+ *
+ * Nothing is ever sent unless BOTH of these environment variables are set:
+ *   ETHBUILD_TEAM_KEY      - the team's access token
+ *   ETHBUILD_TELEMETRY_URL - the https endpoint that should receive the metrics
+ *
+ * There is intentionally no default endpoint, so build metadata and keys
+ * can only ever go to a server the team chose themselves.
  */
 export async function logBuildTelemetry(
   framework: string,
   commandType: 'compile' | 'test',
   wasSuccessful: boolean
 ): Promise<void> {
-  // Retrieve the optional team environment variable token
   const teamKey = process.env.ETHBUILD_TEAM_KEY;
+  const endpoint = process.env.ETHBUILD_TELEMETRY_URL;
 
-  // Free Tier: If no key is set, exit instantly without doing anything
-  if (!teamKey) {
+  // Free tier: if either value is missing, exit without doing anything
+  if (!teamKey || !endpoint) {
     return;
   }
 
-  // Premium Tier Hook: Quietly fire-and-forget metrics to a central tracking hub
-  // We wrap this inside an isolated try-catch so network issues never disrupt the developer
+  // Only ever send the key over https
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return;
+  }
+  if (url.protocol !== 'https:') {
+    return;
+  }
+
+  // Fire-and-forget: network problems must never disrupt the developer
   try {
     const logPayload = {
       timestamp: new Date().toISOString(),
@@ -26,20 +43,19 @@ export async function logBuildTelemetry(
       clientSystem: process.platform
     };
 
-    // This fires asynchronously in the background and does not block the terminal
-    fetch('https://ethbuild.dev', {
+    fetch(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${teamKey}`
       },
       body: JSON.stringify(logPayload),
-      // Enforce a strict network timeout so it drops gracefully if servers are busy
+      // Strict timeout so it drops gracefully if the server is busy
       signal: AbortSignal.timeout(2000)
     }).catch(() => {
-      // Silently swallow errors to keep user experience smooth
+      // Silently swallow errors to keep the experience smooth
     });
   } catch {
-    // Deep fallback catch to prevent local console noise
+    // Deep fallback catch to prevent console noise
   }
 }
