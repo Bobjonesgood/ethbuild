@@ -6,15 +6,18 @@ interface EngineResult {
   isError: boolean;
 }
 
-// Maximum characters of stdout/stderr to send back to the AI client.
-// Keeps token usage predictable even when a build or test run produces
-// a huge amount of output.
+// Successful output is trimmed past this size to keep token usage predictable.
 const MAX_OUTPUT_CHARS = 4000;
+
+// Fallback cap for failures when no known error pattern is found.
+const MAX_FAILURE_OUTPUT_CHARS = 8000;
+
+// Never list more than this many failures or compiler errors.
+const MAX_ITEMS_SHOWN = 10;
 
 /**
  * Trims a large string down to a token-friendly size, keeping the
- * beginning and end (where the useful summary/error info usually lives)
- * and noting how much was cut from the middle.
+ * beginning and end and noting how much was cut from the middle.
  */
 function truncateOutput(text: string, maxChars: number = MAX_OUTPUT_CHARS): string {
   if (text.length <= maxChars) {
@@ -28,6 +31,70 @@ function truncateOutput(text: string, maxChars: number = MAX_OUTPUT_CHARS): stri
   const cutCharCount = text.length - headChars - tailChars;
 
   return `${head}\n\n[... ${cutCharCount} characters truncated to save tokens ...]\n\n${tail}`;
+}
+
+/**
+ * Pulls the useful part out of a failed build or test run.
+ * Keeps failing test lines and compiler error blocks verbatim and drops
+ * everything else (traces, repeated summaries, warnings).
+ * Returns null if nothing recognizable is found, so the caller can fall
+ * back to the raw output.
+ */
+function extractFailureSummary(combined: string): string | null {
+  const lines = combined.split(/\r?\n/);
+
+  // Failing tests look like: [FAIL: reason] testName() (gas: 123)
+  // Forge prints each one twice, so dedupe them.
+  const failLines: string[] = [];
+  const seen = new Set<string>();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^\[FAIL/.test(trimmed) && !seen.has(trimmed)) {
+      seen.add(trimmed);
+      failLines.push(trimmed);
+    }
+  }
+
+  // Compiler errors look like: Error (1234): message
+  // followed by location lines until a blank line.
+  const compileErrors: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*Error(\s*\(\d+\))?:/.test(lines[i])) {
+      const block: string[] = [lines[i].trimEnd()];
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() !== '' && block.length < 12) {
+        block.push(lines[j].trimEnd());
+        j++;
+      }
+      compileErrors.push(block.join('\n'));
+      i = j;
+    }
+  }
+
+  if (failLines.length === 0 && compileErrors.length === 0) {
+    return null;
+  }
+
+  const parts: string[] = [];
+
+  if (compileErrors.length > 0) {
+    parts.push(`Compiler errors (${compileErrors.length}):`);
+    parts.push(...compileErrors.slice(0, MAX_ITEMS_SHOWN));
+    if (compileErrors.length > MAX_ITEMS_SHOWN) {
+      parts.push(`... and ${compileErrors.length - MAX_ITEMS_SHOWN} more compiler errors not shown`);
+    }
+  }
+
+  if (failLines.length > 0) {
+    parts.push(`Failing tests (${failLines.length}):`);
+    parts.push(...failLines.slice(0, MAX_ITEMS_SHOWN));
+    if (failLines.length > MAX_ITEMS_SHOWN) {
+      parts.push(`... and ${failLines.length - MAX_ITEMS_SHOWN} more failing tests not shown`);
+    }
+  }
+
+  parts.push(`[Condensed failure summary. Full output was ${combined.length} characters.]`);
+  return parts.join('\n');
 }
 
 /**
@@ -57,17 +124,33 @@ export async function safeExecuteCommand(
         // Clear the safety timer if the task finishes normally
         clearTimeout(watchdogTimer);
 
-        const isError = !!error;
+        const cleanStdout = stdout.trim();
+        const cleanStderr = stderr.trim();
 
-        // Only truncate on success. Failures keep full output since the
-        // AI needs every detail to actually diagnose and fix the problem.
-        const finalStdout = isError ? stdout.trim() : truncateOutput(stdout.trim());
-        const finalStderr = isError ? (stderr.trim() || error!.message) : truncateOutput(stderr.trim());
+        // Success: trim long output to save tokens.
+        if (!error) {
+          resolve({
+            stdout: truncateOutput(cleanStdout),
+            stderr: truncateOutput(cleanStderr),
+            isError: false
+          });
+          return;
+        }
 
+        // Failure: try to condense to just the errors and failing test names.
+        const combined = [cleanStdout, cleanStderr].filter(Boolean).join('\n');
+        const summary = extractFailureSummary(combined);
+
+        if (summary) {
+          resolve({ stdout: summary, stderr: '', isError: true });
+          return;
+        }
+
+        // Nothing recognizable: return the raw output, capped at a larger size.
         resolve({
-          stdout: finalStdout,
-          stderr: finalStderr,
-          isError
+          stdout: truncateOutput(cleanStdout, MAX_FAILURE_OUTPUT_CHARS),
+          stderr: truncateOutput(cleanStderr || error.message, MAX_FAILURE_OUTPUT_CHARS),
+          isError: true
         });
       }
     );
