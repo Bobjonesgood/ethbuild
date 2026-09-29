@@ -12,6 +12,10 @@ const MAX_OUTPUT_CHARS = 4000;
 // Fallback cap for failures when no known error pattern is found.
 const MAX_FAILURE_OUTPUT_CHARS = 8000;
 
+// Safety cap used when the caller asks for verbose output (full traces).
+// Still bounded so one huge trace cannot flood the agent's context.
+const MAX_VERBOSE_OUTPUT_CHARS = 30000;
+
 // Never list more than this many failures or compiler errors.
 const MAX_ITEMS_SHOWN = 10;
 
@@ -100,12 +104,16 @@ function extractFailureSummary(combined: string): string | null {
 /**
  * Safe command executor designed for AI-driven MCP environments.
  * Prevents freezes, manages memory buffers, and isolates execution errors.
+ *
+ * When verbose is true, output is not condensed. It is only capped at a
+ * large safety limit so full traces can reach the agent.
  */
 export async function safeExecuteCommand(
   baseCommand: 'forge' | 'npx',
   subArguments: string[],
   workingDirectory: string,
-  timeoutMs: number = 45000 // 45-second safety cutoff
+  timeoutMs: number = 45000, // 45-second safety cutoff
+  verbose: boolean = false
 ): Promise<EngineResult> {
 
   // Sanitize input arguments to prevent command injection chains
@@ -126,6 +134,19 @@ export async function safeExecuteCommand(
 
         const cleanStdout = stdout.trim();
         const cleanStderr = stderr.trim();
+
+        // Verbose: skip condensing, return full output up to the safety cap.
+        if (verbose) {
+          resolve({
+            stdout: truncateOutput(cleanStdout, MAX_VERBOSE_OUTPUT_CHARS),
+            stderr: truncateOutput(
+              cleanStderr || (error ? error.message : ''),
+              MAX_VERBOSE_OUTPUT_CHARS
+            ),
+            isError: !!error
+          });
+          return;
+        }
 
         // Success: trim long output to save tokens.
         if (!error) {

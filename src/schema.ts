@@ -20,7 +20,7 @@ export const TOOLS = [
   },
   {
     name: "run_test_suite",
-    description: "Executes the local smart contract test suite to catch runtime bugs and logic flaws.",
+    description: "Executes the local smart contract test suite to catch runtime bugs and logic flaws. By default, failures are condensed to the failing test names and reasons to save tokens. Set verbose to true only when you need the full output, such as Foundry call traces, to debug why a test failed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -32,6 +32,10 @@ export const TOOLS = [
         matchTest: {
           type: "string",
           description: "Optional: Filter to run a specific test name or function."
+        },
+        verbose: {
+          type: "boolean",
+          description: "Optional, defaults to false. When true, returns the full test output instead of a condensed summary. For Foundry this also enables call traces for failing tests (-vvv). Output is still capped at a large safety limit."
         },
         projectPath: {
           type: "string",

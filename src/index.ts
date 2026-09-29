@@ -70,6 +70,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const framework = (args?.framework as 'hardhat' | 'foundry') || 'foundry';
       const matchTest = args?.matchTest as string;
 
+      // Only a literal true turns verbose on. Anything else stays condensed.
+      const verbose = args?.verbose === true;
+
       const commandBase = framework === 'foundry' ? 'forge' : 'npx';
       let commandArgs = framework === 'foundry' ? ['test'] : ['hardhat', 'test'];
 
@@ -78,7 +81,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         commandArgs.push('--match-test', matchTest);
       }
 
-      const result = await safeExecuteCommand(commandBase, commandArgs, workingDirectory);
+      // Forge only prints call traces for failing tests at -vvv.
+      if (verbose && framework === 'foundry') {
+        commandArgs.push('-vvv');
+      }
+
+      const result = await safeExecuteCommand(
+        commandBase,
+        commandArgs,
+        workingDirectory,
+        45000,
+        verbose
+      );
 
       // Silently log metrics in the background for team keys
       logBuildTelemetry(framework, 'test', !result.isError);
