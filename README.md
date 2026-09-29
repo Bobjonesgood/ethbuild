@@ -13,7 +13,7 @@ By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinat
 * **Buffer-Overflow Resistance:** Heavy-duty 10MB memory streaming buffer designed to process massive log outputs from complex multi-file smart contract test suites without choking.
 * **Input Sanitization Shell-Defenses:** Built-in regex filters to strip malicious or accidental command-chain injections before executing payloads on your terminal.
 * **Explicit Project Targeting:** Every tool call takes a `projectPath` argument, so Ethbuild always compiles the project you actually mean -- not wherever the server process happened to start.
-* **Token-Efficient Output:** Successful build/test output is automatically truncated past 4,000 characters to keep AI token usage predictable on large projects. Failed runs are condensed to just the compiler errors and failing test names (`[FAIL: reason] testName()`), deduplicated, so the AI gets what it needs to fix the problem without a wall of trace output. If the output format isn't recognized, the raw output is returned with a larger 8,000-character cap.
+* **Token-Efficient Output:** Successful build/test output is automatically truncated past 4,000 characters to keep AI token usage predictable on large projects. Failed runs are condensed to just the compiler errors and failing test names (`[FAIL: reason] testName()`), deduplicated, so the AI gets what it needs to fix the problem without a wall of trace output. If the output format isn't recognized, the raw output is returned with a larger 8,000-character cap. When the AI needs the full picture, `run_test_suite` accepts `verbose: true` to return complete output, including Foundry call traces, up to a 30,000-character safety cap.
 * **Private by Default:** No telemetry is sent unless you explicitly configure it. See the Configuration section.
 
 ---
@@ -76,11 +76,19 @@ Once connected, your AI assistant will discover and invoke these tools. Both req
 { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts" }
 ```
 
-**`run_test_suite`** -- Runs local framework test files (`forge test` / `npx hardhat test`) inside `projectPath`, with an optional `matchTest` filter to isolate a specific test.
+**`run_test_suite`** -- Runs local framework test files (`forge test` / `npx hardhat test`) inside `projectPath`, with an optional `matchTest` filter to isolate a specific test and an optional `verbose` flag.
 
 ```json
 { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts", "matchTest": "testTransfer" }
 ```
+
+By default, failing runs are condensed to the failing test names and reasons. Set `verbose` to `true` when you need the full output to debug a failure:
+
+```json
+{ "framework": "foundry", "projectPath": "C:/Users/you/my-contracts", "verbose": true }
+```
+
+With Foundry, `verbose` also runs `forge test -vvv`, so failing tests include their call traces and backtraces. With Hardhat, it skips the condensing and returns the full output. In both cases output is capped at 30,000 characters so a huge trace cannot flood the AI's context. `verbose` must be the boolean `true`, not the string `"true"`.
 
 ---
 
