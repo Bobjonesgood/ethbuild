@@ -29,9 +29,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // 2. Process active execution requests sent from the AI client
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-  const workingDirectory = (args?.projectPath as string) || process.cwd(); // Uses the project path passed by the AI client, falling back to cwd
+
+  // Accept the correct camelCase name, or the common snake_case slip,
+  // so a small naming mistake from the AI client still works.
+  const rawProjectPath = (args?.projectPath ?? args?.project_path) as string | undefined;
 
   try {
+    // Every tool below needs a real project path. Fail loudly and clearly
+    // instead of silently falling back to this server's own folder, which
+    // would compile or test the wrong project without any warning.
+    if (!rawProjectPath || rawProjectPath.trim() === '') {
+      return {
+        content: [{
+          type: "text",
+          text: "Ethbuild Error: Missing required argument 'projectPath'. Pass the absolute path to the project's root folder (the one containing foundry.toml or hardhat.config.js)."
+        }],
+        isError: true
+      };
+    }
+
+    const workingDirectory = rawProjectPath;
+
     if (name === "compile_contracts") {
       const framework = (args?.framework as 'hardhat' | 'foundry') || 'foundry';
       const commandBase = framework === 'foundry' ? 'forge' : 'npx';
