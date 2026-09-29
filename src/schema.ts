@@ -44,5 +44,36 @@ export const TOOLS = [
       },
       required: ["framework", "projectPath"]
     }
+  },
+  {
+    name: "deploy_contract",
+    description: "Deploys a compiled Foundry contract to a LOCAL Anvil test chain only (127.0.0.1). It cannot deploy to any other network, and it uses Anvil's built-in test account, so no private key is needed or accepted. Anvil must already be running (start it with 'anvil' in a terminal). Foundry projects only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectPath: {
+          type: "string",
+          description: "Absolute path to the root of the Foundry project (the folder containing foundry.toml)."
+        },
+        contractName: {
+          type: "string",
+          description: "The name of the contract to deploy, for example 'SimpleStorage'."
+        },
+        contractPath: {
+          type: "string",
+          description: "Optional: path to the .sol file relative to the project root, for example 'src/SimpleStorage.sol'. Use this if the contract name alone is ambiguous."
+        },
+        constructorArgs: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional: constructor arguments, in order, each as a string. Values may not start with '-'."
+        },
+        port: {
+          type: "integer",
+          description: "Optional, defaults to 8545. The port the local Anvil node is listening on."
+        }
+      },
+      required: ["projectPath", "contractName"]
+    }
   }
 ];

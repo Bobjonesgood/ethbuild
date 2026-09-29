@@ -1,3 +1,5 @@
+import { existsSync } from "fs";
+import { join } from "path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -6,6 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { TOOLS } from "./schema.js";
 import { safeExecuteCommand } from "./engine.js";
+import { deployContract } from "./deploy.js";
 import { logBuildTelemetry } from "./telemetry.js";
 
 // Initialize the Ethbuild Core Server
@@ -99,6 +102,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       return {
         content: [{ type: "text", text: `Test Suite Output:\n${result.stdout}\n${result.stderr}` }],
+        isError: result.isError
+      };
+    }
+
+    if (name === "deploy_contract") {
+      // Foundry only for now. Fail clearly if this is not a Foundry project.
+      if (!existsSync(join(workingDirectory, 'foundry.toml'))) {
+        return {
+          content: [{
+            type: "text",
+            text: "Ethbuild Error: deploy_contract currently supports Foundry projects only, and no foundry.toml was found in projectPath."
+          }],
+          isError: true
+        };
+      }
+
+      const result = await deployContract({
+        projectPath: workingDirectory,
+        contractName: args?.contractName,
+        contractPath: args?.contractPath,
+        constructorArgs: args?.constructorArgs,
+        port: args?.port
+      });
+
+      return {
+        content: [{ type: "text", text: result.text }],
         isError: result.isError
       };
     }
