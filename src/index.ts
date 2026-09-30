@@ -24,6 +24,47 @@ const server = new Server(
   }
 );
 
+function errorResult(text: string) {
+  return {
+    content: [{ type: "text", text }],
+    isError: true
+  };
+}
+
+// Only the two supported frameworks are accepted. Missing means foundry,
+// as before. Anything else is rejected instead of silently using Hardhat.
+function parseFramework(value: unknown): 'hardhat' | 'foundry' | null {
+  if (value === undefined || value === null || value === '') {
+    return 'foundry';
+  }
+  if (value === 'foundry' || value === 'hardhat') {
+    return value;
+  }
+  return null;
+}
+
+// matchTest is passed to forge as a single argument (no shell), so the risk
+// is it being read as a flag. Reject anything that starts with '-', contains
+// control characters, or is unreasonably long. Returns an error or null.
+function checkMatchTest(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    return "Ethbuild Error: 'matchTest' must be a string.";
+  }
+  if (value.length > 200) {
+    return "Ethbuild Error: 'matchTest' is too long (200 characters maximum).";
+  }
+  if (/[\x00-\x1f\x7f]/.test(value)) {
+    return "Ethbuild Error: 'matchTest' may not contain control characters or line breaks.";
+  }
+  if (value.startsWith('-')) {
+    return "Ethbuild Error: 'matchTest' may not start with '-', so it cannot be read as a command flag.";
+  }
+  return null;
+}
+
 // 1. Expose our schemas so AI editors know what tools are available
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: TOOLS };
@@ -42,19 +83,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // instead of silently falling back to this server's own folder, which
     // would compile or test the wrong project without any warning.
     if (!rawProjectPath || rawProjectPath.trim() === '') {
-      return {
-        content: [{
-          type: "text",
-          text: "Ethbuild Error: Missing required argument 'projectPath'. Pass the absolute path to the project's root folder (the one containing foundry.toml or hardhat.config.js)."
-        }],
-        isError: true
-      };
+      return errorResult("Ethbuild Error: Missing required argument 'projectPath'. Pass the absolute path to the project's root folder (the one containing foundry.toml or hardhat.config.js).");
     }
 
     const workingDirectory = rawProjectPath;
 
     if (name === "compile_contracts") {
-      const framework = (args?.framework as 'hardhat' | 'foundry') || 'foundry';
+      const framework = parseFramework(args?.framework);
+      if (!framework) {
+        return errorResult("Ethbuild Error: 'framework' must be either 'foundry' or 'hardhat'.");
+      }
+
       const commandBase = framework === 'foundry' ? 'forge' : 'npx';
       const commandArgs = framework === 'foundry' ? ['build'] : ['hardhat', 'compile'];
 
@@ -70,8 +109,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (name === "run_test_suite") {
-      const framework = (args?.framework as 'hardhat' | 'foundry') || 'foundry';
-      const matchTest = args?.matchTest as string;
+      const framework = parseFramework(args?.framework);
+      if (!framework) {
+        return errorResult("Ethbuild Error: 'framework' must be either 'foundry' or 'hardhat'.");
+      }
+
+      const matchTestProblem = checkMatchTest(args?.matchTest);
+      if (matchTestProblem) {
+        return errorResult(matchTestProblem);
+      }
+      const matchTest = args?.matchTest as string | undefined;
 
       // Only a literal true turns verbose on. Anything else stays condensed.
       const verbose = args?.verbose === true;
@@ -79,7 +126,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const commandBase = framework === 'foundry' ? 'forge' : 'npx';
       let commandArgs = framework === 'foundry' ? ['test'] : ['hardhat', 'test'];
 
-      // Apply specific test function filter safely if passed by the AI
+      // Apply specific test function filter if passed by the AI
       if (matchTest && framework === 'foundry') {
         commandArgs.push('--match-test', matchTest);
       }
@@ -109,13 +156,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === "deploy_contract") {
       // Foundry only for now. Fail clearly if this is not a Foundry project.
       if (!existsSync(join(workingDirectory, 'foundry.toml'))) {
-        return {
-          content: [{
-            type: "text",
-            text: "Ethbuild Error: deploy_contract currently supports Foundry projects only, and no foundry.toml was found in projectPath."
-          }],
-          isError: true
-        };
+        return errorResult("Ethbuild Error: deploy_contract currently supports Foundry projects only, and no foundry.toml was found in projectPath.");
       }
 
       const result = await deployContract({
@@ -134,10 +175,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     throw new Error(`Tool requested [${name}] was not found inside Ethbuild.`);
   } catch (error: any) {
-    return {
-      content: [{ type: "text", text: `Ethbuild Internal Exception: ${error.message}` }],
-      isError: true
-    };
+    return errorResult(`Ethbuild Internal Exception: ${error.message}`);
   }
 });
 

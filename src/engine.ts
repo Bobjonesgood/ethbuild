@@ -1,4 +1,7 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
+import type { ChildProcess } from 'child_process';
+import { existsSync } from 'fs';
+import { dirname, join } from 'path';
 
 interface EngineResult {
   stdout: string;
@@ -101,9 +104,63 @@ function extractFailureSummary(combined: string): string | null {
   return parts.join('\n');
 }
 
+interface ResolvedCommand {
+  file: string;
+  args: string[];
+  error?: string;
+}
+
+/**
+ * Works out exactly which program to launch, with no shell involved.
+ *
+ * forge is a real executable, so it can be launched directly.
+ *
+ * npx on Windows is npx.cmd, a batch file. Node refuses to launch .cmd files
+ * without a shell (a security fix), so on Windows we run npm's npx-cli.js
+ * with node itself. That file sits next to node.exe in a standard install.
+ */
+function resolveCommand(baseCommand: 'forge' | 'npx', args: string[]): ResolvedCommand {
+  if (baseCommand === 'forge') {
+    return { file: 'forge', args };
+  }
+
+  if (process.platform !== 'win32') {
+    return { file: 'npx', args };
+  }
+
+  const npxCli = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js');
+  if (!existsSync(npxCli)) {
+    return {
+      file: '',
+      args,
+      error: `Ethbuild Error: could not find npx next to node (looked for ${npxCli}). Hardhat commands need a standard Node.js install that includes npm.`
+    };
+  }
+
+  return { file: process.execPath, args: [npxCli, ...args] };
+}
+
+/**
+ * Stops a command and everything it started. On Windows, killing only the
+ * direct child can leave grandchildren (for example hardhat under npx)
+ * running, so taskkill /T ends the whole tree.
+ */
+function killProcessTree(child: ChildProcess): void {
+  if (process.platform === 'win32' && child.pid) {
+    execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {
+      // best effort, nothing to do if it fails
+    });
+  } else {
+    child.kill('SIGKILL');
+  }
+}
+
 /**
  * Safe command executor designed for AI-driven MCP environments.
  * Prevents freezes, manages memory buffers, and isolates execution errors.
+ *
+ * No shell is used. The program is launched directly with an argument list,
+ * so nothing in an argument can be interpreted as a shell command.
  *
  * When verbose is true, output is not condensed. It is only capped at a
  * large safety limit so full traces can reach the agent.
@@ -116,28 +173,40 @@ export async function safeExecuteCommand(
   verbose: boolean = false
 ): Promise<EngineResult> {
 
-  // Sanitize input arguments to prevent command injection chains
-  const safeArgs = subArguments.map(arg => arg.replace(/[;&|`\$]/g, ''));
-  const fullCommand = `${baseCommand} ${safeArgs.join(' ')}`;
+  const fullCommand = `${baseCommand} ${subArguments.join(' ')}`;
+
+  const resolved = resolveCommand(baseCommand, subArguments);
+  if (resolved.error) {
+    return { stdout: '', stderr: resolved.error, isError: true };
+  }
 
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: EngineResult) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(watchdogTimer);
+      resolve(result);
+    };
+
     // Allocate a generous 10MB buffer so massive logs do not crash the process
-    const process = exec(
-      fullCommand,
+    const child = execFile(
+      resolved.file,
+      resolved.args,
       {
         cwd: workingDirectory,
         maxBuffer: 1024 * 1024 * 10,
+        windowsHide: true,
       },
       (error, stdout, stderr) => {
-        // Clear the safety timer if the task finishes normally
-        clearTimeout(watchdogTimer);
-
-        const cleanStdout = stdout.trim();
-        const cleanStderr = stderr.trim();
+        const cleanStdout = (stdout || '').trim();
+        const cleanStderr = (stderr || '').trim();
 
         // Verbose: skip condensing, return full output up to the safety cap.
         if (verbose) {
-          resolve({
+          finish({
             stdout: truncateOutput(cleanStdout, MAX_VERBOSE_OUTPUT_CHARS),
             stderr: truncateOutput(
               cleanStderr || (error ? error.message : ''),
@@ -150,7 +219,7 @@ export async function safeExecuteCommand(
 
         // Success: trim long output to save tokens.
         if (!error) {
-          resolve({
+          finish({
             stdout: truncateOutput(cleanStdout),
             stderr: truncateOutput(cleanStderr),
             isError: false
@@ -163,12 +232,12 @@ export async function safeExecuteCommand(
         const summary = extractFailureSummary(combined);
 
         if (summary) {
-          resolve({ stdout: summary, stderr: '', isError: true });
+          finish({ stdout: summary, stderr: '', isError: true });
           return;
         }
 
         // Nothing recognizable: return the raw output, capped at a larger size.
-        resolve({
+        finish({
           stdout: truncateOutput(cleanStdout, MAX_FAILURE_OUTPUT_CHARS),
           stderr: truncateOutput(cleanStderr || error.message, MAX_FAILURE_OUTPUT_CHARS),
           isError: true
@@ -176,10 +245,10 @@ export async function safeExecuteCommand(
       }
     );
 
-    // The Watchdog Timer: Kills the command forcefully if it hangs
+    // The Watchdog Timer: kills the command and its children if it hangs
     const watchdogTimer = setTimeout(() => {
-      process.kill('SIGKILL');
-      resolve({
+      killProcessTree(child);
+      finish({
         stdout: "",
         stderr: `TIMEOUT ERROR: Command [${fullCommand}] exceeded the safety limit of ${timeoutMs / 1000}s and was terminated to prevent an IDE lockup.`,
         isError: true
