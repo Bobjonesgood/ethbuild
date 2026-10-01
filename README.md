@@ -1,6 +1,6 @@
 # Ethbuild
 
-**Ethbuild** is a high-reliability Model Context Protocol (MCP) server designed to give AI coding assistants (like Claude, Cursor, and Cline) direct terminal access to local smart contract frameworks.
+**Ethbuild** is a Model Context Protocol (MCP) server designed to give AI coding assistants (like Claude, Cursor, and Cline) direct terminal access to local smart contract frameworks.
 
 By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinating compilation syntax errors. The AI can autonomously compile smart contracts, interpret output logs, run test suites, and patch logic bugs directly on your machine.
 
@@ -9,9 +9,9 @@ By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinat
 ## Features
 
 * **Autonomous Smart Contract Compilation:** Supports local framework verification via Hardhat and Foundry execution environments.
-* **Bulletproof Execution Safety Engine:** Hardened with a native 45-second watchdog execution cutoff timer to prevent system lockups or frozen IDE instances.
-* **Buffer-Overflow Resistance:** Heavy-duty 10MB memory streaming buffer designed to process massive log outputs from complex multi-file smart contract test suites without choking.
-* **Input Sanitization Shell-Defenses:** Built-in regex filters to strip malicious or accidental command-chain injections before executing payloads on your terminal.
+* **Execution Watchdog:** Every compile and test command has a 45-second cutoff. When it trips, Ethbuild stops the command and the processes it started (on Windows it ends the whole process tree), so a hung build cannot freeze your IDE or leave stray processes running.
+* **Large Output Buffer:** A 10MB buffer lets complex multi-file test suites print large logs without crashing the server.
+* **No Shell Execution:** `forge` and Hardhat are launched directly with an argument list, never through a shell, so nothing in an argument can be interpreted as a shell command. Arguments are also validated: `framework` must be `foundry` or `hardhat`, and `matchTest` may not start with `-` (so it cannot be read as a flag), contain control characters, or exceed 200 characters.
 * **Explicit Project Targeting:** Every tool call takes a `projectPath` argument, so Ethbuild always compiles the project you actually mean -- not wherever the server process happened to start.
 * **Token-Efficient Output:** Successful build/test output is automatically truncated past 4,000 characters to keep AI token usage predictable on large projects. Failed runs are condensed to just the compiler errors and failing test names (`[FAIL: reason] testName()`), deduplicated, so the AI gets what it needs to fix the problem without a wall of trace output. If the output format isn't recognized, the raw output is returned with a larger 8,000-character cap. When the AI needs the full picture, `run_test_suite` accepts `verbose: true` to return complete output, including Foundry call traces, up to a 30,000-character safety cap.
 * **Safe Local Deployment:** `deploy_contract` lets the AI deploy a Foundry contract to a local Anvil test chain so it can go from compile to test to deploy in one session. It is locked to `127.0.0.1`, accepts no RPC URL and no private key, and cannot reach a real network. See the `deploy_contract` section below.
@@ -56,6 +56,8 @@ To grant your AI coding agent access to Ethbuild, add this server execution bloc
 
 > **Note:** Cline's MCP settings file has moved locations across versions. If your server shows as connected but tools aren't behaving as expected, confirm you're editing the file Cline is actually reading -- check `%USERPROFILE%\.cline\data\settings\cline_mcp_settings.json` first.
 
+After rebuilding Ethbuild, toggle the server off and on in your client (and start a new task) so it loads the new build and tool list.
+
 ---
 
 ## Framework Requirements
@@ -63,8 +65,16 @@ To grant your AI coding agent access to Ethbuild, add this server execution bloc
 Ethbuild doesn't bundle Foundry or Hardhat itself -- it runs whatever toolchain is already set up in your target project.
 
 * **Foundry:** requires `forge` installed and available on your system PATH ([getfoundry.sh](https://getfoundry.sh)), plus a `foundry.toml` in the project root.
-* **Hardhat:** requires `hardhat` installed as a project dependency (`npm install --save-dev hardhat`) and a `hardhat.config.js`/`.ts` in the project root. On a fresh project, the first compile may take a few extra seconds while Hardhat downloads the matching `solc` compiler version -- this is normal.
+* **Hardhat:** requires `hardhat` installed as a project dependency (`npm install --save-dev hardhat`) and a `hardhat.config.js`/`.ts` in the project root. On a fresh project, the first compile may take a few extra seconds while Hardhat downloads the matching `solc` compiler version -- this is normal. On Windows, Ethbuild runs Hardhat through `node` and the `npx-cli.js` file that ships with npm, so it needs a standard Node.js install that includes npm.
 * **Anvil (only for `deploy_contract`):** Anvil ships with Foundry, so if `forge` is installed you already have it. Check with `anvil --version`.
+
+---
+
+## Security Notes
+
+Ethbuild does not sandbox your project. Compiling and testing run your project's own tooling, and that tooling can run code: a Hardhat config is JavaScript, and Foundry settings in `foundry.toml` can enable features such as `ffi`. Only point Ethbuild at projects you trust, the same as you would before running `npm test` or `forge test` yourself.
+
+What Ethbuild does limit is the part it controls: it never invokes a shell, it validates the arguments it is given, it stops runaway commands, and `deploy_contract` can only reach a local Anvil chain.
 
 ---
 
@@ -78,11 +88,13 @@ Once connected, your AI assistant will discover and invoke these tools. All thre
 { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts" }
 ```
 
-**`run_test_suite`** -- Runs local framework test files (`forge test` / `npx hardhat test`) inside `projectPath`, with an optional `matchTest` filter to isolate a specific test and an optional `verbose` flag.
+**`run_test_suite`** -- Runs local framework test files (`forge test` / `npx hardhat test`) inside `projectPath`, with an optional `matchTest` filter to isolate specific tests and an optional `verbose` flag.
 
 ```json
 { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts", "matchTest": "testTransfer" }
 ```
+
+With Foundry, `matchTest` is passed to `forge test --match-test`, so it accepts a regular expression. For example, `"testTransfer|testApprove"` runs both tests. It may not start with `-`. (`matchTest` applies to Foundry only.)
 
 By default, failing runs are condensed to the failing test names and reasons. Set `verbose` to `true` when you need the full output to debug a failure:
 
@@ -128,7 +140,7 @@ Optional arguments:
 **Safety rules.** Because this is the one tool that sends transactions, it is deliberately narrow:
 
 * **Localhost only.** The host is fixed at `127.0.0.1`. There is no argument for an RPC URL, so the AI cannot point the tool at a public network.
-* **Chain ID check.** Before deploying, Ethbuild asks the node for its chain ID and refuses unless it is 31337, Anvil's default. A node reporting any other chain ID is rejected, which typically includes forks of real networks.
+* **Chain ID check.** Before deploying, Ethbuild asks the node for its chain ID and refuses unless it is 31337, Anvil's default. A node reporting any other chain ID is rejected.
 * **No private keys.** The tool accepts no key. It uses Anvil's well-known public test account, which only holds fake ETH on a local chain, and that key is never included in the tool's output or accepted as an argument, so it never appears in your chat history.
 * **No shell.** `forge` is launched directly rather than through a shell, so nothing in an argument can be interpreted as a command.
 * **Strict input validation.** The contract name, contract path, constructor arguments, and port are checked before anything runs. Constructor arguments may not start with `-`, so they cannot be read as command-line flags. This also means negative numbers cannot be passed as constructor arguments for now.
