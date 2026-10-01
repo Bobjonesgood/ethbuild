@@ -1,6 +1,6 @@
 {
   "name": "ethbuild",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Ethbuild: High-reliability MCP Server for Solidity Compilation and Testing",
   "main": "dist/index.js",
   "type": "module",
@@ -15,8 +15,12 @@
     "hardhat",
     "web3"
   ],
-  "author": "",
+  "author": "Bobby Bowles",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bobjonesgood/ethbuild.git"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1"
   },

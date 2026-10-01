@@ -15,7 +15,7 @@ import { logBuildTelemetry } from "./telemetry.js";
 const server = new Server(
   {
     name: "ethbuild",
-    version: "1.0.0",
+    version: "0.1.0",
   },
   {
     capabilities: {
