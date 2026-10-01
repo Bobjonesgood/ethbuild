@@ -47,7 +47,7 @@ function truncateOutput(text: string, maxChars: number = MAX_OUTPUT_CHARS): stri
  * Returns null if nothing recognizable is found, so the caller can fall
  * back to the raw output.
  */
-function extractFailureSummary(combined: string): string | null {
+export function extractFailureSummary(combined: string): string | null {
   const lines = combined.split(/\r?\n/);
 
   // Failing tests look like: [FAIL: reason] testName() (gas: 123)
