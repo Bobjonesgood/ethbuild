@@ -229,7 +229,9 @@ export async function safeExecuteCommand(
 
         // Failure: try to condense to just the errors and failing test names.
         const combined = [cleanStdout, cleanStderr].filter(Boolean).join('\n');
-        const summary = extractFailureSummary(combined);
+        // The condenser understands Forge output only. Hardhat output is already compact,
+        // and would be mislabeled, so it is passed through raw.
+        const summary = baseCommand === 'forge' ? extractFailureSummary(combined) : null;
 
         if (summary) {
           finish({ stdout: summary, stderr: '', isError: true });
