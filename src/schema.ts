@@ -20,7 +20,7 @@ export const TOOLS = [
   },
   {
     name: "run_test_suite",
-    description: "Executes the local smart contract test suite to catch runtime bugs and logic flaws. By default, failures are condensed to the failing test names and reasons to save tokens. Set verbose to true only when you need the full output, such as Foundry call traces, to debug why a test failed.",
+    description: "Executes the local smart contract test suite to catch runtime bugs and logic flaws. For Foundry, failures are condensed to the failing test names and reasons to save tokens. For Hardhat, failure output is returned as-is. Set verbose to true only when you need the full output, such as Foundry call traces, to debug why a test failed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -31,7 +31,7 @@ export const TOOLS = [
         },
         matchTest: {
           type: "string",
-          description: "Optional: Filter to run a specific test name or function."
+          description: "Optional, Foundry only: filter to run specific tests. Accepts a regular expression such as 'testA|testB'. May not start with '-'."
         },
         verbose: {
           type: "boolean",

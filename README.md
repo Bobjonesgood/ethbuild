@@ -13,7 +13,7 @@ By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinat
 * **Large Output Buffer:** A 10MB buffer lets complex multi-file test suites print large logs without crashing the server.
 * **No Shell Execution:** `forge` and Hardhat are launched directly with an argument list, never through a shell, so nothing in an argument can be interpreted as a shell command. Arguments are also validated: `framework` must be `foundry` or `hardhat`, and `matchTest` may not start with `-` (so it cannot be read as a flag), contain control characters, or exceed 200 characters.
 * **Explicit Project Targeting:** Every tool call takes a `projectPath` argument, so Ethbuild always compiles the project you actually mean -- not wherever the server process happened to start.
-* **Token-Efficient Output:** Successful build/test output is automatically truncated past 4,000 characters to keep AI token usage predictable on large projects. Failed runs are condensed to just the compiler errors and failing test names (`[FAIL: reason] testName()`), deduplicated, so the AI gets what it needs to fix the problem without a wall of trace output. If the output format isn't recognized, the raw output is returned with a larger 8,000-character cap. When the AI needs the full picture, `run_test_suite` accepts `verbose: true` to return complete output, including Foundry call traces, up to a 30,000-character safety cap.
+* **Token-Efficient Output:** Successful build/test output is automatically truncated past 4,000 characters to keep AI token usage predictable on large projects. For Foundry, failed runs are condensed to just the compiler errors and failing test names (`[FAIL: reason] testName()`), deduplicated, so the AI gets what it needs to fix the problem without a wall of trace output. Hardhat failure output is already compact, so it is returned as-is, capped at 8,000 characters. When the AI needs the full picture, `run_test_suite` accepts `verbose: true` to return complete output, including Foundry call traces, up to a 30,000-character safety cap.
 * **Safe Local Deployment:** `deploy_contract` lets the AI deploy a Foundry contract to a local Anvil test chain so it can go from compile to test to deploy in one session. It is locked to `127.0.0.1`, accepts no RPC URL and no private key, and cannot reach a real network. See the `deploy_contract` section below.
 * **Private by Default:** No telemetry is sent unless you explicitly configure it. See the Configuration section.
 
@@ -74,6 +74,8 @@ Ethbuild doesn't bundle Foundry or Hardhat itself -- it runs whatever toolchain 
 
 Ethbuild does not sandbox your project. Compiling and testing run your project's own tooling, and that tooling can run code: a Hardhat config is JavaScript, and Foundry settings in `foundry.toml` can enable features such as `ffi`. Only point Ethbuild at projects you trust, the same as you would before running `npm test` or `forge test` yourself.
 
+The AI agent chooses the `projectPath` for each call, so if your client auto-approves tool calls, a mistaken or manipulated agent could run a project you did not intend. Consider requiring approval for Ethbuild calls when working near untrusted code.
+
 What Ethbuild does limit is the part it controls: it never invokes a shell, it validates the arguments it is given, it stops runaway commands, and `deploy_contract` can only reach a local Anvil chain.
 
 ---
@@ -96,13 +98,13 @@ Once connected, your AI assistant will discover and invoke these tools. All thre
 
 With Foundry, `matchTest` is passed to `forge test --match-test`, so it accepts a regular expression. For example, `"testTransfer|testApprove"` runs both tests. It may not start with `-`. (`matchTest` applies to Foundry only.)
 
-By default, failing runs are condensed to the failing test names and reasons. Set `verbose` to `true` when you need the full output to debug a failure:
+By default, failing Foundry runs are condensed to the failing test names and reasons. Failing Hardhat runs are returned as-is, capped at 8,000 characters. Set `verbose` to `true` when you need the full output to debug a failure:
 
 ```json
 { "framework": "foundry", "projectPath": "C:/Users/you/my-contracts", "verbose": true }
 ```
 
-With Foundry, `verbose` also runs `forge test -vvv`, so failing tests include their call traces and backtraces. With Hardhat, it skips the condensing and returns the full output. In both cases output is capped at 30,000 characters so a huge trace cannot flood the AI's context. `verbose` must be the boolean `true`, not the string `"true"`.
+With Foundry, `verbose` also runs `forge test -vvv`, so failing tests include their call traces and backtraces. With Hardhat, it raises the output cap to 30,000 characters. In both cases output is capped at 30,000 characters so a huge trace cannot flood the AI's context. `verbose` must be the boolean `true`, not the string `"true"`.
 
 **`deploy_contract`** -- Deploys a compiled Foundry contract to a local Anvil test chain using `forge create`. Foundry projects only.
 
@@ -179,6 +181,20 @@ Ethbuild does not read `.env` files. Set the variables in the `env` block of you
 A template of these variables is included as `.env.example`.
 
 **What telemetry sends:** a timestamp, the framework (foundry or hardhat), whether the run was a compile or a test, whether it succeeded or failed, and the operating system. It never sends your code, file paths, or command output.
+
+---
+
+## Testing
+
+Ethbuild has its own unit tests. From the repository folder:
+
+```bash
+npm test
+```
+
+This builds the project and runs the tests with Node's built-in test runner. They cover the `deploy_contract` input validation and the Foundry failure summarizer. They need no Anvil, Foundry, or Hardhat installed, and they never touch a network.
+
+Live behavior (real compiles, test runs, and deploys) has been checked by hand against Foundry, Hardhat, and a local Anvil node, but is not part of the automated suite yet.
 
 ---
 
