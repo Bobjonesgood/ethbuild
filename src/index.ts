@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { existsSync } from "fs";
 import { join } from "path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";

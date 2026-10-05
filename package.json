@@ -4,10 +4,22 @@
   "description": "Ethbuild: High-reliability MCP Server for Solidity Compilation and Testing",
   "main": "dist/index.js",
   "type": "module",
+  "bin": {
+    "ethbuild": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "tsc && node --test"
+    "test": "tsc && node --test",
+    "prepublishOnly": "npm test"
   },
   "keywords": [
     "mcp-server",
@@ -21,6 +33,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Bobjonesgood/ethbuild.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1"
