@@ -1,5 +1,7 @@
 # Ethbuild
 
+cd C:\ethbuild; git diff --stat
+
 **Ethbuild** is a Model Context Protocol (MCP) server designed to give AI coding assistants (like Claude, Cursor, and Cline) direct terminal access to local smart contract frameworks.
 
 By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinating compilation syntax errors. The AI can autonomously compile smart contracts, interpret output logs, run test suites, and patch logic bugs directly on your machine.
