@@ -1,5 +1,5 @@
 {
-  "name": "ethbuild",
+  "name": "@bobjonesgood/ethbuild",
   "version": "0.1.0",
   "description": "Ethbuild: High-reliability MCP Server for Solidity Compilation and Testing",
   "main": "dist/index.js",
@@ -32,7 +32,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Bobjonesgood/ethbuild.git"
+    "url": "git+https://github.com/Bobjonesgood/ethbuild.git"
   },
   "publishConfig": {
     "access": "public"
