@@ -1,6 +1,6 @@
 # Ethbuild
 
-cd C:\ethbuild; git diff --stat
+[![CI](https://github.com/Bobjonesgood/ethbuild/actions/workflows/ci.yml/badge.svg)](https://github.com/Bobjonesgood/ethbuild/actions/workflows/ci.yml)
 
 **Ethbuild** is a Model Context Protocol (MCP) server designed to give AI coding assistants (like Claude, Cursor, and Cline) direct terminal access to local smart contract frameworks.
 
