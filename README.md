@@ -23,7 +23,7 @@ By acting as the AI's local compiler eyes, Ethbuild stops models from hallucinat
 
 ## Installation
 
-Ethbuild isn't published to the npm registry yet -- install it by cloning and building locally:
+Ethbuild is published on npm as `ethbuild`. You do not need to install anything by hand: point your MCP client at `npx -y ethbuild` (see AI Client Configuration below). To build from source instead, clone and build locally:
 
 ```bash
 git clone https://github.com/Bobjonesgood/ethbuild.git
@@ -37,6 +37,14 @@ This produces `dist/index.js`, which is the compiled entry point your AI client 
 ---
 
 ## AI Client Configuration
+
+**Using the npm package (recommended):**
+
+```json
+{ "mcpServers": { "ethbuild": { "command": "npx", "args": ["-y", "ethbuild"] } } }
+```
+
+**Running from a local clone:** add the block below to your editor's MCP settings file instead.
 
 To grant your AI coding agent access to Ethbuild, add this server execution block to your editor's MCP settings file.
 
